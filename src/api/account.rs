@@ -62,9 +62,10 @@ pub async fn get_pnl(
     let mut buy_cost: HashMap<String, Decimal> = HashMap::new();
     let mut buy_qty: HashMap<String, Decimal> = HashMap::new();
 
-    for o in orders.iter().filter(|o| {
-        o.status == OrderStatus::Filled && o.side == crate::models::Side::Buy
-    }) {
+    for o in orders
+        .iter()
+        .filter(|o| o.status == OrderStatus::Filled && o.side == crate::models::Side::Buy)
+    {
         *buy_cost.entry(o.symbol.clone()).or_insert(Decimal::ZERO) += o.price * o.amount;
         *buy_qty.entry(o.symbol.clone()).or_insert(Decimal::ZERO) += o.amount;
     }
@@ -84,9 +85,10 @@ pub async fn get_pnl(
     // Accumulate realized PnL per (symbol, order_type)
     let mut realized_map: HashMap<(String, OrderType), Decimal> = HashMap::new();
 
-    for o in orders.iter().filter(|o| {
-        o.status == OrderStatus::Filled && o.side == crate::models::Side::Sell
-    }) {
+    for o in orders
+        .iter()
+        .filter(|o| o.status == OrderStatus::Filled && o.side == crate::models::Side::Sell)
+    {
         let avg = avg_buy.get(&o.symbol).copied().unwrap_or(Decimal::ZERO);
         let pnl = (o.price - avg) * o.amount;
         *realized_map
@@ -118,7 +120,11 @@ pub async fn get_pnl(
     }
 
     // Sort details for stable output
-    realized_details.sort_by(|a, b| a.symbol.cmp(&b.symbol).then(a.order_type.as_str().cmp(b.order_type.as_str())));
+    realized_details.sort_by(|a, b| {
+        a.symbol
+            .cmp(&b.symbol)
+            .then(a.order_type.as_str().cmp(b.order_type.as_str()))
+    });
 
     let realized_total: Decimal = realized_by_symbol.values().sum();
 

@@ -4,7 +4,7 @@
 use crate::db;
 use crate::error::AppError;
 use crate::models::{new_id, Order, OrderStatus, OrderType, Position, Side, User};
-use crate::order_book::PendingLimitOrder;
+use crate::order_book::{new_pending, PendingLimitOrder};
 use crate::ws_client::PriceCache;
 use chrono::Utc;
 use clickhouse::Client;
@@ -21,7 +21,11 @@ pub struct Engine {
 
 impl Engine {
     pub fn new(client: Client, prices: PriceCache, symbols: Vec<String>) -> Self {
-        Self { client, prices, symbols }
+        Self {
+            client,
+            prices,
+            symbols,
+        }
     }
 
     /// Place a market or limit order for `user` on `raw_symbol` for `amount` units.
@@ -37,7 +41,8 @@ impl Engine {
         order_type: OrderType,
         limit_price: Option<Decimal>,
     ) -> Result<(Order, Option<PendingLimitOrder>), AppError> {
-        let symbol = self.normalize_symbol(raw_symbol)
+        let symbol = self
+            .normalize_symbol(raw_symbol)
             .ok_or_else(|| AppError::UnknownSymbol(raw_symbol.to_string()))?;
 
         if amount <= Decimal::ZERO {
@@ -47,22 +52,27 @@ impl Engine {
         match order_type {
             OrderType::Market => self.execute_market(user, symbol, side, amount).await,
             OrderType::Limit => {
-                let lp = limit_price
-                    .ok_or_else(|| AppError::BadRequest("limit_price is required for limit orders".into()))?;
+                let lp = limit_price.ok_or_else(|| {
+                    AppError::BadRequest("limit_price is required for limit orders".into())
+                })?;
                 if lp <= Decimal::ZERO {
                     return Err(AppError::BadRequest("limit_price must be > 0".into()));
                 }
                 self.execute_limit(user, symbol, side, amount, lp).await
             }
-            OrderType::StopLimit => {
-                Err(AppError::BadRequest("stop_limit orders are not yet supported".into()))
-            }
+            OrderType::StopLimit => Err(AppError::BadRequest(
+                "stop_limit orders are not yet supported".into(),
+            )),
         }
     }
 
     fn normalize_symbol(&self, raw: &str) -> Option<String> {
         let upper = raw.to_uppercase().replace('-', "/");
-        if self.symbols.contains(&upper) { Some(upper) } else { None }
+        if self.symbols.contains(&upper) {
+            Some(upper)
+        } else {
+            None
+        }
     }
 
     // ── Market order ──────────────────────────────────────────────────────────
@@ -74,7 +84,10 @@ impl Engine {
         side: Side,
         amount: Decimal,
     ) -> Result<(Order, Option<PendingLimitOrder>), AppError> {
-        let price_f64 = self.prices.get(&symbol).map(|p| *p)
+        let price_f64 = self
+            .prices
+            .get(&symbol)
+            .map(|p| *p)
             .ok_or_else(|| AppError::Internal(format!("No live price for {}", symbol)))?;
 
         let price = Decimal::from_f64(price_f64)
@@ -84,8 +97,14 @@ impl Engine {
         let total_usdc = (price * amount).round_dp(8);
 
         let (status, reject_reason) = match side {
-            Side::Buy => self.fill_market_buy(user, &symbol, price, amount, total_usdc).await?,
-            Side::Sell => self.fill_market_sell(user, &symbol, amount, total_usdc).await?,
+            Side::Buy => {
+                self.fill_market_buy(user, &symbol, price, amount, total_usdc)
+                    .await?
+            }
+            Side::Sell => {
+                self.fill_market_sell(user, &symbol, amount, total_usdc)
+                    .await?
+            }
         };
 
         let now = Utc::now();
@@ -186,9 +205,19 @@ impl Engine {
             Side::Buy => {
                 let cost = (limit_price * amount).round_dp(8);
                 if user.balance_usdc < cost {
-                    let order = rejected_order(&user.id, &symbol, side, OrderType::Limit, amount, now,
+                    let order = rejected_order(
+                        &user.id,
+                        &symbol,
+                        side,
+                        OrderType::Limit,
+                        amount,
+                        now,
                         Some(limit_price),
-                        format!("Insufficient balance: need {} USDC, have {}", cost, user.balance_usdc));
+                        format!(
+                            "Insufficient balance: need {} USDC, have {}",
+                            cost, user.balance_usdc
+                        ),
+                    );
                     db::insert_order(&self.client, &order).await?;
                     return Ok((order, None));
                 }
@@ -201,9 +230,19 @@ impl Engine {
                 let held = pos.map(|p| p.quantity).unwrap_or(Decimal::ZERO);
 
                 if held < amount {
-                    let order = rejected_order(&user.id, &symbol, side, OrderType::Limit, amount, now,
+                    let order = rejected_order(
+                        &user.id,
+                        &symbol,
+                        side,
+                        OrderType::Limit,
+                        amount,
+                        now,
                         Some(limit_price),
-                        format!("Insufficient position: need {}, have {} {}", amount, held, symbol));
+                        format!(
+                            "Insufficient position: need {}, have {} {}",
+                            amount, held, symbol
+                        ),
+                    );
                     db::insert_order(&self.client, &order).await?;
                     return Ok((order, None));
                 }
@@ -232,17 +271,7 @@ impl Engine {
         db::insert_order(&self.client, &order).await?;
         db::update_user_balance(&self.client, user).await?;
 
-        let pending = PendingLimitOrder {
-            order_id: order.id.clone(),
-            user_id: user.id.clone(),
-            side,
-            symbol,
-            amount,
-            limit_price,
-            created_at: now,
-            locked_usdc,
-            locked_qty,
-        };
+        let pending = new_pending(&order, locked_usdc, locked_qty);
 
         info!(
             order_id    = %order.id,
@@ -307,7 +336,11 @@ pub(crate) async fn pub_update_position_sell(
         user_id: pos.user_id.clone(),
         symbol: symbol.to_string(),
         quantity: new_qty,
-        avg_buy_price: if new_qty.is_zero() { Decimal::ZERO } else { pos.avg_buy_price },
+        avg_buy_price: if new_qty.is_zero() {
+            Decimal::ZERO
+        } else {
+            pos.avg_buy_price
+        },
         updated_at: Utc::now(),
     };
 

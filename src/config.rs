@@ -37,8 +37,7 @@ impl Config {
                 .unwrap_or_else(|_| "exchange_user".to_string()),
             clickhouse_password: env::var("CLICKHOUSE_PASSWORD")
                 .unwrap_or_else(|_| "exchange_pass".to_string()),
-            clickhouse_db: env::var("CLICKHOUSE_DB")
-                .unwrap_or_else(|_| "exchange".to_string()),
+            clickhouse_db: env::var("CLICKHOUSE_DB").unwrap_or_else(|_| "exchange".to_string()),
             hft_ws_url: env::var("HFT_WS_URL")
                 .unwrap_or_else(|_| "ws://localhost:8080/v1/feed".to_string()),
             jwt_secret: env::var("JWT_SECRET")

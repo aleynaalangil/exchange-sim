@@ -108,8 +108,8 @@ impl std::fmt::Display for Side {
 pub enum OrderStatus {
     Filled,
     Rejected,
-    Pending,   // open limit order waiting to be matched
-    Canceled,  // limit order canceled by the user
+    Pending,  // open limit order waiting to be matched
+    Canceled, // limit order canceled by the user
 }
 
 impl OrderStatus {

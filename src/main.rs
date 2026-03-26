@@ -104,7 +104,10 @@ async fn main() -> std::io::Result<()> {
                     std::process::exit(1);
                 }
                 let delay = Duration::from_secs(2u64.pow(attempt.min(4)));
-                warn!("ClickHouse not ready (attempt {}/10): {}. Retrying in {:?}…", attempt, e, delay);
+                warn!(
+                    "ClickHouse not ready (attempt {}/10): {}. Retrying in {:?}…",
+                    attempt, e, delay
+                );
                 sleep(delay).await;
             }
         }
@@ -201,7 +204,7 @@ async fn main() -> std::io::Result<()> {
                     .service(api::admin::update_balance)
                     .service(api::admin::list_all_orders)
                     .service(api::admin::list_symbols)
-                    .service(api::admin::live_prices)
+                    .service(api::admin::live_prices),
             )
     })
     .bind(&bind_addr)?

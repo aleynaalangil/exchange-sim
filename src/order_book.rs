@@ -14,18 +14,18 @@
 
 use crate::db;
 use crate::error::AppError;
-use crate::models::{new_id, Order, OrderStatus, Position, Side};
+use crate::models::{Order, Position, Side};
 use crate::ws_client::PriceCache;
 use chrono::Utc;
 use clickhouse::Client;
 use dashmap::DashMap;
-use rust_decimal::Decimal;
 use rust_decimal::prelude::FromPrimitive;
+use rust_decimal::Decimal;
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
 use tokio::time::{interval, Duration};
 use tokio_util::sync::CancellationToken;
-use tracing::{error, info, warn};
+use tracing::{error, info};
 
 // ── PendingLimitOrder ─────────────────────────────────────────────────────────
 
@@ -84,11 +84,9 @@ impl OrderBook {
     /// Removes and returns the order if found (needed by cancel to reclaim locked funds).
     pub async fn remove(&self, order_id: &str) -> Option<PendingLimitOrder> {
         let mut book = self.inner.write().await;
-        if let Some(pos) = book.iter().position(|o| o.order_id == order_id) {
-            Some(book.remove(pos))
-        } else {
-            None
-        }
+        book.iter()
+            .position(|o| o.order_id == order_id)
+            .map(|pos| book.remove(pos))
     }
 
     /// Atomically drains all orders that can be filled at the current market prices.
@@ -218,9 +216,12 @@ async fn fill_order(
             let actual_cost = total_usdc;
             let refund = (pending.locked_usdc - actual_cost).max(Decimal::ZERO);
             if refund > Decimal::ZERO {
-                let mut user = db::get_user_by_id(db, &pending.user_id)
-                    .await?
-                    .ok_or_else(|| AppError::NotFound("User not found during fill refund".into()))?;
+                let mut user =
+                    db::get_user_by_id(db, &pending.user_id)
+                        .await?
+                        .ok_or_else(|| {
+                            AppError::NotFound("User not found during fill refund".into())
+                        })?;
                 user.balance_usdc += refund;
                 user.created_at = now;
                 db::update_user_balance(db, &user).await?;
@@ -252,11 +253,7 @@ async fn fill_order(
 
 /// Build a `PendingLimitOrder` id for a freshly created limit order that has
 /// no order_id yet. Pass this along with the `Order` returned by the engine.
-pub fn new_pending(
-    order: &Order,
-    locked_usdc: Decimal,
-    locked_qty: Decimal,
-) -> PendingLimitOrder {
+pub fn new_pending(order: &Order, locked_usdc: Decimal, locked_qty: Decimal) -> PendingLimitOrder {
     PendingLimitOrder {
         order_id: order.id.clone(),
         user_id: order.user_id.clone(),

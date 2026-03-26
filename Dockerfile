@@ -1,5 +1,5 @@
 # ── build stage ──────────────────────────────────────────────────────────────
-FROM rust:latest AS builder
+FROM rust:1.93 AS builder
 
 RUN apt-get update && apt-get install -y pkg-config libssl-dev && rm -rf /var/lib/apt/lists/*
 

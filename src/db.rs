@@ -206,7 +206,10 @@ pub async fn insert_user(client: &Client, user: &User) -> Result<(), AppError> {
         .map_err(AppError::Clickhouse)
 }
 
-pub async fn get_user_by_username(client: &Client, username: &str) -> Result<Option<User>, AppError> {
+pub async fn get_user_by_username(
+    client: &Client,
+    username: &str,
+) -> Result<Option<User>, AppError> {
     let rows: Vec<UserRow> = client
         .query(
             "SELECT id, username, password_hash, role, balance_usdc,
@@ -281,7 +284,7 @@ pub async fn insert_order(client: &Client, order: &Order) -> Result<(), AppError
         .bind(order.limit_price.map(|p| p.to_string()).unwrap_or_default())
         .bind(order.status.as_str())
         .bind(order.reject_reason.as_deref().unwrap_or(""))
-        .bind("")  // realized_pnl: not computed here
+        .bind("") // realized_pnl: not computed here
         .bind(order.created_at.format("%Y-%m-%d %H:%M:%S%.6f").to_string())
         .bind(order.updated_at.format("%Y-%m-%d %H:%M:%S%.6f").to_string())
         .execute()

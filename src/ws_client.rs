@@ -15,11 +15,7 @@ pub fn new_price_cache() -> PriceCache {
     Arc::new(DashMap::new())
 }
 
-pub async fn run_ws_client(
-    ws_url: String,
-    prices: PriceCache,
-    cancel: CancellationToken,
-) {
+pub async fn run_ws_client(ws_url: String, prices: PriceCache, cancel: CancellationToken) {
     loop {
         if cancel.is_cancelled() {
             break;

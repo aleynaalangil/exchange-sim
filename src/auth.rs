@@ -15,10 +15,10 @@ pub type TokenBlocklist = DashMap<String, u64>;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Claims {
-    pub sub: String,   // user_id
-    pub role: String,  // "admin" | "trader"
-    pub exp: u64,      // Unix timestamp (seconds since epoch)
-    pub jti: String,   // unique token ID — used for revocation
+    pub sub: String,  // user_id
+    pub role: String, // "admin" | "trader"
+    pub exp: u64,     // Unix timestamp (seconds since epoch)
+    pub jti: String,  // unique token ID — used for revocation
 }
 
 pub fn create_token(
@@ -27,8 +27,7 @@ pub fn create_token(
     secret: &str,
     expiry_hours: u64,
 ) -> Result<String, AppError> {
-    let exp = (Utc::now() + Duration::hours(expiry_hours as i64))
-        .timestamp() as u64;
+    let exp = (Utc::now() + Duration::hours(expiry_hours as i64)).timestamp() as u64;
 
     let claims = Claims {
         sub: user_id.to_string(),

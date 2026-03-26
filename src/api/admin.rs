@@ -57,7 +57,9 @@ pub async fn create_user(
         username: body.username.clone(),
         password_hash,
         role,
-        balance_usdc: body.initial_balance.unwrap_or_else(|| Decimal::from(10000u32)),
+        balance_usdc: body
+            .initial_balance
+            .unwrap_or_else(|| Decimal::from(10000u32)),
         created_at: Utc::now(),
         is_active: true,
     };
